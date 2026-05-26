@@ -27,9 +27,15 @@ description: Generate an image via OpenAI Images API (gpt-image-2). Use when a s
 
 ## הקריאה ל-API
 
-### שלב 1, שלח את הבקשה ושמור את התשובה כ-JSON
+### ⚠️ חשוב, השתמש בקובץ response זמני ייחודי
+
+**אל תשתמש בשם קבוע כמו `response.json`.** אם רצות שתי קריאות במקביל, הן ידרסו אחת את השנייה ויקבלו את אותה תמונה. השתמש ב-temp file unique לכל קריאה (לדוגמה: `mktemp` או שם שמבוסס על ה-slug).
+
+### שלב 1, הכן temp file ושלח את הבקשה
 
 ```bash
+RESP=$(mktemp --suffix=.json)  # או: RESP="yuval/outputs/.resp-${SLUG}.json"
+
 curl -X POST "https://api.openai.com/v1/images/generations" \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H "Content-Type: application/json" \
@@ -39,10 +45,10 @@ curl -X POST "https://api.openai.com/v1/images/generations" \
     "size": "1024x1024",
     "quality": "medium",
     "output_format": "png"
-  }' -o response.json
+  }' -o "$RESP"
 ```
 
-החלף את `<THE_PROMPT>` ב-prompt בפועל. הקפד לברוח (escape) מירכאות פנימיות אם יש.
+החלף את `<THE_PROMPT>` ב-prompt בפועל. הקפד לברוח (escape) מירכאות פנימיות אם יש. עדיף לבנות את ה-JSON עם python/jq כדי למנוע בעיות escaping.
 
 ### שלב 2, decode של ה-base64 לקובץ PNG
 
@@ -50,12 +56,12 @@ curl -X POST "https://api.openai.com/v1/images/generations" \
 
 **Primary (Linux/Mac/Git Bash עם כלים מותקנים):**
 ```bash
-jq -r '.data[0].b64_json' response.json | base64 --decode > <output-path>.png
+jq -r '.data[0].b64_json' "$RESP" | base64 --decode > "<output-path>.png"
 ```
 
 **Python fallback (מומלץ כברירת מחדל ב-Windows / Git Bash ללא jq):**
 ```bash
-python -c "import json,base64,sys; d=json.load(open('response.json')); open(sys.argv[1],'wb').write(base64.b64decode(d['data'][0]['b64_json']))" <output-path>.png
+python -c "import json,base64,sys; d=json.load(open(sys.argv[1])); open(sys.argv[2],'wb').write(base64.b64decode(d['data'][0]['b64_json']))" "$RESP" "<output-path>.png"
 ```
 
 אם Python 3 הוא `python3` בלבד במערכת, החלף את `python` ל-`python3`.
@@ -63,18 +69,18 @@ python -c "import json,base64,sys; d=json.load(open('response.json')); open(sys.
 ### שלב 3, verification
 
 ```bash
-[ -s <output-path>.png ] && echo "OK: <output-path>.png" || echo "FAILED, see response.json"
+[ -s "<output-path>.png" ] && echo "OK: <output-path>.png" || (echo "FAILED"; cat "$RESP")
 ```
 
-אם הקובץ ריק או חסר, פתח את `response.json` וקרא את שדה ה-`error` שלו, החזר את ההודעה כשגיאה.
+אם הקובץ ריק או חסר, קרא את שדה ה-`error` ב-`$RESP` והחזר את ההודעה כשגיאה.
 
 ### שלב 4, cleanup
 
 ```bash
-rm -f response.json
+rm -f "$RESP"
 ```
 
-רק אחרי decode מוצלח. אם נכשל, השאר את `response.json` כדי לאבחן.
+רק אחרי decode מוצלח. אם נכשל, השאר את ה-temp file כדי לאבחן (והדפס את שמו).
 
 ## Parameters שניתן להעביר
 

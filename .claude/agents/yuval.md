@@ -65,9 +65,12 @@ mkdir -p yuval/outputs
 DATE=$(date +%Y-%m-%d)
 SLUG="<kebab-case-up-to-6-words-en>"
 OUT="yuval/outputs/${DATE}-${SLUG}.png"
+
+# CRITICAL: temp file unique לכל קריאה, כדי שריצות מקבילות לא ידרסו זו את זו
+RESP=$(mktemp --suffix=.json)
 ```
 
-הפעל את הסקיל `gpt-image-gen` (ראה `.claude/skills/gpt-image-gen/SKILL.md`). השתמש בנתיבים מעלה.
+הפעל את הסקיל `gpt-image-gen` (ראה `.claude/skills/gpt-image-gen/SKILL.md`). השתמש בנתיבים מעלה, **כולל `$RESP` כ-temp file ולא `response.json`**.
 
 ### שלב 5 - שמור sibling .txt עם ה-prompt
 
@@ -80,10 +83,10 @@ echo "<full prompt used>" > "yuval/outputs/${DATE}-${SLUG}.txt"
 ### שלב 6 - verification
 
 ```bash
-[ -s "$OUT" ] && echo "OK" || (echo "FAILED"; cat response.json 2>/dev/null)
+[ -s "$OUT" ] && echo "OK" || (echo "FAILED"; cat "$RESP")
 ```
 
-אם הקובץ ריק או חסר, החזר לראובן את הודעת השגיאה מ-`response.json`.
+אם הקובץ ריק או חסר, החזר לראובן את הודעת השגיאה מ-`$RESP` (ואל תמחק אותו, כדי לאבחן).
 
 ### שלב 7 - דווח לראובן
 
